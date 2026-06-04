@@ -21,7 +21,10 @@ public class RatchetItUpGameJam : ModuleRules
 			"Niagara",
 			"UMG",
 			"Slate",
-			"CableComponent"
+			"SlateCore",
+			"CableComponent",
+			"LevelSequence",
+			"MovieScene"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
