@@ -249,12 +249,11 @@ void ARatchetItUpGameJamGameMode::PlayOpenTransitionIfNeeded()
 		return;
 	}
 
-	// If we arrived via AdvanceToNextLevel, the subsystem is already revealing,
-	// so only fade in here for direct loads (e.g. pressing PIE on a level).
-	if (!Transition->IsTransitioning())
-	{
-		Transition->PlayOpenTransition(TransitionSettings, SlideWidgetClass);
-	}
+	// Reveal with THIS level's settings (bounce, duration, color). Covers both
+	// direct loads (no cover yet) and arrivals via a transition (panel is left
+	// covering after the load, waiting for us to reveal it). PlayOpenTransition
+	// self-guards if a transition is somehow still mid-flight.
+	Transition->PlayOpenTransition(TransitionSettings, SlideWidgetClass);
 }
 
 void ARatchetItUpGameJamGameMode::PlaySequenceThen(ULevelSequence* Sequence, TFunction<void()> OnDone)

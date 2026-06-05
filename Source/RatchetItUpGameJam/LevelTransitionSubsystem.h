@@ -59,9 +59,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Level Transition")
 	void CloseAndQuitGame(FSlideTransitionSettings Settings, TSubclassOf<USlideTransitionWidget> WidgetClass);
 
-	/** True while a transition is in progress (cover, load, or reveal). */
+	/** True while a transition is in progress (cover, load, held cover, or reveal). */
 	UFUNCTION(BlueprintPure, Category = "Level Transition")
-	bool IsTransitioning() const { return bBusy; }
+	bool IsTransitioning() const { return bBusy || bAwaitingReveal; }
 
 private:
 
@@ -83,6 +83,9 @@ private:
 	/** Reveal finished: tear down the panel and clear busy state. */
 	void HandleSlideOutComplete();
 
+	/** Safety reveal if the destination level never calls PlayOpenTransition. */
+	void HandleFallbackReveal();
+
 	/** Persistent transition widget; UPROPERTY keeps it alive across level loads. */
 	UPROPERTY(Transient)
 	TObjectPtr<USlideTransitionWidget> Widget = nullptr;
@@ -101,6 +104,12 @@ private:
 
 	/** True while waiting for the map we requested to finish loading. */
 	bool bAwaitingLoad = false;
+
+	/** True after a transition load while the screen is held covered, awaiting the destination's reveal. */
+	bool bAwaitingReveal = false;
+
+	/** Fires the fallback reveal if the destination never reveals itself. */
+	FTimerHandle FallbackRevealHandle;
 
 	/** Z-order for the panel; above HUD and everything else. */
 	static constexpr int32 TransitionZOrder = 1000;

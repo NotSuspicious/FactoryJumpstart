@@ -4,9 +4,11 @@
 #include "SlideTransitionWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/GameInstance.h"
+#include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "TimerManager.h"
 #include "UObject/UObjectGlobals.h"
 
 void ULevelTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -79,12 +81,24 @@ void ULevelTransitionSubsystem::PlayOpenTransition(FSlideTransitionSettings Sett
 		return;
 	}
 
+	// Taking over the reveal; cancel the post-load fallback if it was queued.
+	bAwaitingReveal = false;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(FallbackRevealHandle);
+	}
+
 	bBusy = true;
 	PendingSettings = Settings;
 
 	TransitionWidget->ApplySettings(Settings);
 	TransitionWidget->SnapToCovered();
-	TransitionWidget->AddToViewport(TransitionZOrder);
+
+	// The panel may already be in the viewport (held covering after a transition load).
+	if (!TransitionWidget->IsInViewport())
+	{
+		TransitionWidget->AddToViewport(TransitionZOrder);
+	}
 
 	TransitionWidget->OnSlideOutComplete.BindUObject(this, &ULevelTransitionSubsystem::HandleSlideOutComplete);
 	TransitionWidget->PlaySlideOut(Settings.EntryDuration);
@@ -172,8 +186,28 @@ void ULevelTransitionSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
 	TransitionWidget->SnapToCovered();
 	TransitionWidget->AddToViewport(TransitionZOrder);
 
-	TransitionWidget->OnSlideOutComplete.BindUObject(this, &ULevelTransitionSubsystem::HandleSlideOutComplete);
-	TransitionWidget->PlaySlideOut(PendingSettings.EntryDuration);
+	// Hand the reveal to the destination level's GameMode so it uses ITS OWN
+	// settings (its bounce, duration, color). Free bBusy so PlayOpenTransition runs.
+	bBusy = false;
+	bAwaitingReveal = true;
+
+	// Safety net: if the destination never reveals (e.g. a level without our
+	// GameMode), reveal here so we never get stuck on a covered screen.
+	if (LoadedWorld)
+	{
+		LoadedWorld->GetTimerManager().SetTimer(FallbackRevealHandle, this, &ULevelTransitionSubsystem::HandleFallbackReveal, 2.0f, false);
+	}
+}
+
+void ULevelTransitionSubsystem::HandleFallbackReveal()
+{
+	if (!bAwaitingReveal)
+	{
+		return;
+	}
+
+	// Nobody took over the reveal; do it with the transition's own settings.
+	PlayOpenTransition(PendingSettings, PendingWidgetClass);
 }
 
 void ULevelTransitionSubsystem::HandleSlideOutComplete()
