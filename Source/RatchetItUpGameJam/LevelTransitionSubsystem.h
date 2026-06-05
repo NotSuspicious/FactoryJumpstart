@@ -45,6 +45,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Level Transition")
 	void PlayOpenTransition(FSlideTransitionSettings Settings, TSubclassOf<USlideTransitionWidget> WidgetClass);
 
+	/**
+	 * Plays only the "close" (cover) half of a transition: slides the panel in to
+	 * fully cover the screen, then runs OnCovered and leaves the screen covered.
+	 * Use to fade out before an action that ends the current view (e.g. quitting).
+	 */
+	void PlayCloseTransition(FSlideTransitionSettings Settings, TSubclassOf<USlideTransitionWidget> WidgetClass, FSimpleDelegate OnCovered);
+
+	/**
+	 * Covers the screen with the close transition, then quits the game.
+	 * Callable from any GameMode/widget (e.g. a main menu Quit button).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Level Transition")
+	void CloseAndQuitGame(FSlideTransitionSettings Settings, TSubclassOf<USlideTransitionWidget> WidgetClass);
+
 	/** True while a transition is in progress (cover, load, or reveal). */
 	UFUNCTION(BlueprintPure, Category = "Level Transition")
 	bool IsTransitioning() const { return bBusy; }
@@ -56,6 +70,12 @@ private:
 
 	/** Slide-in finished: the screen is fully covered, so kick off the actual load. */
 	void HandleSlideInComplete();
+
+	/** Close slide-in finished: the screen is fully covered, so run the stored callback. */
+	void HandleCloseCovered();
+
+	/** Quits the game immediately (used as the CloseAndQuitGame callback). */
+	void QuitGameNow();
 
 	/** New map is ready (and not yet rendered): re-show the covered panel, then reveal. */
 	void HandlePostLoadMap(UWorld* LoadedWorld);
@@ -70,6 +90,9 @@ private:
 	FSlideTransitionSettings PendingSettings;
 	TSoftObjectPtr<UWorld> PendingLevel;
 	TSubclassOf<USlideTransitionWidget> PendingWidgetClass;
+
+	/** Callback run once a close transition has fully covered the screen. */
+	FSimpleDelegate CloseCallback;
 
 	FDelegateHandle PostLoadMapHandle;
 

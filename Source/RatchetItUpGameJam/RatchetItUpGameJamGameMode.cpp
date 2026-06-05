@@ -9,6 +9,7 @@
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "LevelSequence.h"
 #include "LevelSequencePlayer.h"
 #include "MovieSceneSequencePlaybackSettings.h"
@@ -100,9 +101,10 @@ bool ARatchetItUpGameJamGameMode::HasNextLevel() const
 
 void ARatchetItUpGameJamGameMode::AdvanceToNextLevel()
 {
+	// Final level completed: head back to the main menu instead.
 	if (!HasNextLevel())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AdvanceToNextLevel: no level after index %d in Levels."), CurrentLevelIndex);
+		ReturnToMainMenu();
 		return;
 	}
 
@@ -130,6 +132,55 @@ void ARatchetItUpGameJamGameMode::AdvanceToNextLevel()
 	{
 		UGameplayStatics::OpenLevelBySoftObjectPtr(this, NextLevel);
 	}
+}
+
+void ARatchetItUpGameJamGameMode::ReturnToMainMenu()
+{
+	if (MainMenuLevel.IsNull())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ReturnToMainMenu: MainMenuLevel is not set."));
+		return;
+	}
+
+	ULevelTransitionSubsystem* Transition = GetTransitionSubsystem();
+	if (Transition && Transition->IsTransitioning())
+	{
+		return;
+	}
+
+	// Restart progression so the next playthrough begins at the first level.
+	CurrentLevelIndex = 0;
+
+	if (Transition)
+	{
+		Transition->TransitionToLevel(MainMenuLevel, TransitionSettings, SlideWidgetClass);
+	}
+	else
+	{
+		UGameplayStatics::OpenLevelBySoftObjectPtr(this, MainMenuLevel);
+	}
+}
+
+void ARatchetItUpGameJamGameMode::QuitGame()
+{
+	ULevelTransitionSubsystem* Transition = GetTransitionSubsystem();
+
+	// No subsystem available, or one is already mid-transition: just quit.
+	if (!Transition || Transition->IsTransitioning())
+	{
+		DoQuit();
+		return;
+	}
+
+	// Cover the screen, then quit once it is fully covered.
+	FSimpleDelegate OnCovered = FSimpleDelegate::CreateUObject(this, &ARatchetItUpGameJamGameMode::DoQuit);
+	Transition->PlayCloseTransition(TransitionSettings, SlideWidgetClass, OnCovered);
+}
+
+void ARatchetItUpGameJamGameMode::DoQuit()
+{
+	APlayerController* PlayerController = GetGameInstance() ? GetGameInstance()->GetFirstLocalPlayerController() : nullptr;
+	UKismetSystemLibrary::QuitGame(this, PlayerController, EQuitPreference::Quit, /*bIgnorePlatformRestrictions*/ false);
 }
 
 // ---------------------------------------------------------------------------

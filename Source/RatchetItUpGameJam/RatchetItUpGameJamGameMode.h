@@ -40,11 +40,20 @@ public:
 	void OnPuzzleSolved();
 
 	/**
-	 * Slides the transition closed and loads the next level in Levels.
+	 * Slides the transition closed and loads the next level in Levels. If there
+	 * is no next level (the final level was completed), returns to the main menu.
 	 * Called automatically at the end of the scene-end flow; also callable directly.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Level Flow")
 	void AdvanceToNextLevel();
+
+	/** Slides the transition closed and loads the main menu level. */
+	UFUNCTION(BlueprintCallable, Category = "Level Flow")
+	void ReturnToMainMenu();
+
+	/** Plays the close transition (covers the screen), then quits the game. */
+	UFUNCTION(BlueprintCallable, Category = "Level Flow")
+	void QuitGame();
 
 	/** Returns the zero-based index of the level currently being played. */
 	UFUNCTION(BlueprintPure, Category = "Level Flow")
@@ -77,6 +86,10 @@ protected:
 	/** Widget class for the slide. Defaults to the C++ USlideTransitionWidget. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Level Flow|Levels")
 	TSubclassOf<USlideTransitionWidget> SlideWidgetClass;
+
+	/** Level loaded when the final level is completed (or ReturnToMainMenu is called). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Level Flow|Levels")
+	TSoftObjectPtr<UWorld> MainMenuLevel;
 
 	/** Dialogue widget / input / style configuration (shared across levels). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Level Flow|Dialogue")
@@ -112,6 +125,9 @@ private:
 	int32 FindCurrentLevelIndex() const;
 
 	ULevelTransitionSubsystem* GetTransitionSubsystem() const;
+
+	/** Quits the game immediately (run once the close transition has covered the screen). */
+	void DoQuit();
 
 	/** Per-level content resolved for the level currently being played. */
 	UPROPERTY(Transient)

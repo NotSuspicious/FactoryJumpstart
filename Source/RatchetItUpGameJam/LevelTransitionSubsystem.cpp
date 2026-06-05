@@ -4,7 +4,9 @@
 #include "SlideTransitionWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/GameInstance.h"
+#include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "UObject/UObjectGlobals.h"
 
 void ULevelTransitionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -86,6 +88,54 @@ void ULevelTransitionSubsystem::PlayOpenTransition(FSlideTransitionSettings Sett
 
 	TransitionWidget->OnSlideOutComplete.BindUObject(this, &ULevelTransitionSubsystem::HandleSlideOutComplete);
 	TransitionWidget->PlaySlideOut(Settings.EntryDuration);
+}
+
+void ULevelTransitionSubsystem::PlayCloseTransition(FSlideTransitionSettings Settings, TSubclassOf<USlideTransitionWidget> WidgetClass, FSimpleDelegate OnCovered)
+{
+	if (bBusy)
+	{
+		return;
+	}
+
+	USlideTransitionWidget* TransitionWidget = EnsureWidget(WidgetClass);
+	if (!TransitionWidget)
+	{
+		// No widget available; run the callback immediately so the action still happens.
+		OnCovered.ExecuteIfBound();
+		return;
+	}
+
+	bBusy = true;
+	PendingSettings = Settings;
+	CloseCallback = OnCovered;
+
+	TransitionWidget->ApplySettings(Settings);
+	TransitionWidget->AddToViewport(TransitionZOrder);
+
+	TransitionWidget->OnSlideInComplete.BindUObject(this, &ULevelTransitionSubsystem::HandleCloseCovered);
+	TransitionWidget->PlaySlideIn(Settings.ExitDuration);
+}
+
+void ULevelTransitionSubsystem::HandleCloseCovered()
+{
+	// Screen is fully covered. Run the callback (e.g. quit) and leave it covered
+	// so nothing flashes back into view. bBusy intentionally stays set.
+	FSimpleDelegate Callback = CloseCallback;
+	CloseCallback.Unbind();
+	Callback.ExecuteIfBound();
+}
+
+void ULevelTransitionSubsystem::CloseAndQuitGame(FSlideTransitionSettings Settings, TSubclassOf<USlideTransitionWidget> WidgetClass)
+{
+	FSimpleDelegate OnCovered = FSimpleDelegate::CreateUObject(this, &ULevelTransitionSubsystem::QuitGameNow);
+	PlayCloseTransition(Settings, WidgetClass, OnCovered);
+}
+
+void ULevelTransitionSubsystem::QuitGameNow()
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	APlayerController* PlayerController = GameInstance ? GameInstance->GetFirstLocalPlayerController() : nullptr;
+	UKismetSystemLibrary::QuitGame(this, PlayerController, EQuitPreference::Quit, /*bIgnorePlatformRestrictions*/ false);
 }
 
 void ULevelTransitionSubsystem::HandleSlideInComplete()
