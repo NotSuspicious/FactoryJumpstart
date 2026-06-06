@@ -75,7 +75,8 @@ void ARatchetItUpGameJamGameMode::OnPuzzleSolved()
 		const TArray<FText> Lines = ActiveFlowData ? ActiveFlowData->EndDialogue : TArray<FText>();
 		PlayDialogueThen(Lines, [this]()
 		{
-			StartSceneOutro();
+			FreezePlayer(false);
+			//StartSceneOutro();
 		});
 	});
 }
